@@ -22,15 +22,25 @@ smc_precincts = smc_precincts[['geometry']]
 
 precincts = pd.concat([smc_precincts, scc_precincts])
 
-## SCC data
-scc_consolidations = {}
+consolidations = {}
 for line in open('./scc_consolidations_2018.txt'):
     sline = line.split('\t')
     from_p = sline[0].split()[-1]
     to_p = sline[2].split()[-1].split('/')[0]
-    if from_p != to_p:
-        scc_consolidations[f'SC_{from_p}'] = f'SC_{to_p}'
+    consolidations[f'SC_{from_p}'] = f'SC_{to_p}'
 
+for line in open('./smc_consolidations.txt'):
+    good_p = line.split()[0]
+    consolidations[f'SM_{good_p}'] = f'SM_{good_p}'
+    for d in line.split()[1:]:
+        consolidations[f'SM_{d}'] = f'SM_{good_p}'
+
+precincts = precincts.assign(cons=pd.Series(consolidations))
+precincts.cons = precincts.loc[:, 'cons'].fillna(precincts.index.to_series())
+precincts = precincts.dissolve(by='cons')
+
+
+## SCC data
 CACHE_PATH = './cached_smc.json'
 if not os.path.exists(CACHE_PATH):
     scc_all_res = requests.get('https://results.enr.clarityelections.com//CA/Santa_Clara/101316/244146/json/ALL.json').json()['Contests']
@@ -57,19 +67,11 @@ def get_scc_results(race_name, cand_name):
             if scc_contest_names[contest] == race_name:
                 results[f'SC_{precinct}'] = votes[cand_name] / sum(values)
 
-    # TODO: technically better to merge the polygons in precincts, but this works for display
-    # for k, v in scc_consolidations.items():
-    #     if v in results:
-    #         results[k] = results[v]
     return results
 
 ## SMC data
 smc_votes = pd.read_csv('./smc_2020_primary/36_electionresults_03_05_2020.csv')
 smc_votes.set_index('Precinct_name', inplace=True)
-smc_consolidations = {}
-for line in open('./smc_consolidations.txt'):
-    for d in line.split()[1:]:
-        smc_consolidations[f'SM_{d}'] = f'SM_{line.split()[0]}'
 
 def get_smc_results(race_name, cand_name):
     results = smc_votes[
@@ -80,11 +82,6 @@ def get_smc_results(race_name, cand_name):
     results_p = results['total_votes'] / results['total_ballots']
     results_p.index = 'SM_' + results_p.index.map(str)
     results_p = results_p.to_dict()
-
-    # TODO: technically better to merge the polygons in precincts, but this works for display
-    # for k, v in smc_consolidations.items():
-    #     if v in results_p:
-    #         results_p[k] = results_p[v]
 
     return results_p
 
