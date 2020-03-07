@@ -8,11 +8,15 @@ import pandas as pd
 
 
 # load all the maps
-scc_precincts = read_file('./SCC_BOUNDARIES/Precinct_Boundaries.shp')
-# scc_precincts = scc_precincts[scc_precincts['VALID'] == 'Valid']
+# scc_precincts = read_file('./SCC_BOUNDARIES/Precinct_Boundaries.shp')
+# # scc_precincts = scc_precincts[scc_precincts['VALID'] == 'Valid']
+# scc_precincts.set_index('PRECINCT', inplace=True)
+# scc_precincts.index = 'SC_' + scc_precincts.index.map(str)
+# scc_precincts = scc_precincts[['geometry']]
+
+scc_precincts = read_file('./SCC_WEB_BOUNDARIES/ELECTION_PRECINCTS.shp')
 scc_precincts.set_index('PRECINCT', inplace=True)
 scc_precincts.index = 'SC_' + scc_precincts.index.map(str)
-scc_precincts = scc_precincts[['geometry']]
 
 smc_precincts = read_file('./SMC_BOUNDARIES/ELECTION_PRECINCTS.shp')
 smc_precincts.set_index('ELECTION_P', inplace=True)
@@ -23,11 +27,11 @@ smc_precincts = smc_precincts[['geometry']]
 precincts = pd.concat([smc_precincts, scc_precincts])
 
 consolidations = {}
-for line in open('./scc_consolidations_2018.txt'):
-    sline = line.split('\t')
-    from_p = sline[0].split()[-1]
-    to_p = sline[2].split()[-1].split('/')[0]
-    consolidations[f'SC_{from_p}'] = f'SC_{to_p}'
+# for line in open('./scc_consolidations_2018.txt'):
+#     sline = line.split('\t')
+#     from_p = sline[0].split()[-1]
+#     to_p = sline[2].split()[-1].split('/')[0]
+#     consolidations[f'SC_{from_p}'] = f'SC_{to_p}'
 
 for line in open('./smc_consolidations.txt'):
     good_p = line.split()[0]
@@ -64,13 +68,13 @@ def get_scc_results(race_name, cand_name):
         for contest, values in zip(r['C'], r['V']):
             assert len(values) == len(scc_contest_options[contest])
             votes = dict(zip(scc_contest_options[contest], values))
-            if scc_contest_names[contest] == race_name:
+            if scc_contest_names[contest] == race_name and sum(values) > 0:
                 results[f'SC_{precinct}'] = votes[cand_name] / sum(values)
 
     return results
 
 ## SMC data
-smc_votes = pd.read_csv('./smc_2020_primary/36_electionresults_03_05_2020.csv')
+smc_votes = pd.read_csv('./smc_2020_primary/36_electionresults_03_06_2020.csv')
 smc_votes.set_index('Precinct_name', inplace=True)
 
 def get_smc_results(race_name, cand_name):
@@ -86,19 +90,22 @@ def get_smc_results(race_name, cand_name):
     return results_p
 
 # now make some maps
-# masur_p_scc = get_scc_results('State Senator, District 13', 'SHELLY MASUR')
-# masur_p = get_smc_results('State Senator, 13th District', 'SHELLY MASUR')
-masur_p_scc = get_scc_results('State Senator, District 13', 'SALLY J. LIEBER')
-masur_p = get_smc_results('State Senator, 13th District', 'SALLY J. LIEBER')
+masur_p_scc = get_scc_results('State Senator, District 13', 'SHELLY MASUR')
+masur_p = get_smc_results('State Senator, 13th District', 'SHELLY MASUR')
+# masur_p_scc = get_scc_results('State Senator, District 13', 'SALLY J. LIEBER')
+# masur_p = get_smc_results('State Senator, 13th District', 'SALLY J. LIEBER')
 masur_p.update(masur_p_scc)
 masur_p = pd.Series(masur_p)
 
+p13_p_scc = get_scc_results('Proposition 13', 'YES')
 p13_p = get_smc_results('Proposition 13 (Majority Approval Required)', 'YES')
+p13_p.update(p13_p_scc)
+p13_p = pd.Series(p13_p)
 # p13_p = get_smc_results('San Mateo Union High School District, Measure L (55 Percent Approval Required)', 'BONDS YES')
 dem_p = get_smc_results('President of the United States, Democratic', 'MICHAEL R. BLOOMBERG')
 # 'BERNIE SANDERS', 'ELIZABETH WARREN', 'JOSEPH R. BIDEN'
 
-precincts = precincts.assign(masur=masur_p)
+precincts = precincts.assign(masur=masur_p, p13=p13_p)
 
 fig, ax = plt.subplots(1, 1)
 ax.set_axis_off()
@@ -107,6 +114,8 @@ base = precincts.plot(column='masur', ax=ax, vmin=0.1, vmax=0.4, edgecolor=(0,0,
 # base = precincts.plot(column='p13', ax=ax, vmin=0.35, vmax=0.75, cmap='PiYG', edgecolor=(0,0,0,0), legend=True)
 smc_cities = read_file('./SMC_BOUNDARIES/CITY.shp')
 smc_cities.plot(ax=ax, facecolor=(0,0,0,0), edgecolor="black")
+scc_cities = read_file('./SCC_CITY_BOUNDARIES/Cities.shp')
+scc_cities.plot(ax=ax, facecolor=(0,0,0,0), edgecolor="black")
 
 # precincts['coords'] = precincts['geometry'].apply(lambda x: x.representative_point().coords[:])
 # precincts['coords'] = [coords[0] for coords in precincts['coords']]
