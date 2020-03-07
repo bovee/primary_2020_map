@@ -8,12 +8,6 @@ import pandas as pd
 
 
 # load all the maps
-# scc_precincts = read_file('./SCC_BOUNDARIES/Precinct_Boundaries.shp')
-# # scc_precincts = scc_precincts[scc_precincts['VALID'] == 'Valid']
-# scc_precincts.set_index('PRECINCT', inplace=True)
-# scc_precincts.index = 'SC_' + scc_precincts.index.map(str)
-# scc_precincts = scc_precincts[['geometry']]
-
 scc_precincts = read_file('./SCC_WEB_BOUNDARIES/ELECTION_PRECINCTS.shp')
 scc_precincts.set_index('PRECINCT', inplace=True)
 scc_precincts.index = 'SC_' + scc_precincts.index.map(str)
@@ -27,12 +21,6 @@ smc_precincts = smc_precincts[['geometry']]
 precincts = pd.concat([smc_precincts, scc_precincts])
 
 consolidations = {}
-# for line in open('./scc_consolidations_2018.txt'):
-#     sline = line.split('\t')
-#     from_p = sline[0].split()[-1]
-#     to_p = sline[2].split()[-1].split('/')[0]
-#     consolidations[f'SC_{from_p}'] = f'SC_{to_p}'
-
 for line in open('./smc_consolidations.txt'):
     good_p = line.split()[0]
     consolidations[f'SM_{good_p}'] = f'SM_{good_p}'
@@ -47,8 +35,8 @@ precincts = precincts.dissolve(by='cons')
 ## SCC data
 CACHE_PATH = './cached_smc.json'
 if not os.path.exists(CACHE_PATH):
-    scc_all_res = requests.get('https://results.enr.clarityelections.com//CA/Santa_Clara/101316/244146/json/ALL.json').json()['Contests']
-    scc_summary = requests.get('https://results.enr.clarityelections.com//CA/Santa_Clara/101316/244146/json/en/summary.json').json()
+    scc_all_res = requests.get('https://results.enr.clarityelections.com//CA/Santa_Clara/101316/244280/json/ALL.json').json()['Contests']
+    scc_summary = requests.get('https://results.enr.clarityelections.com//CA/Santa_Clara/101316/244280/json/en/summary.json').json()
     json.dump([scc_all_res, scc_summary], open(CACHE_PATH, 'w'))
 else:
     scc_all_res, scc_summary = json.load(open(CACHE_PATH))
@@ -90,12 +78,13 @@ def get_smc_results(race_name, cand_name):
     return results_p
 
 # now make some maps
-masur_p_scc = get_scc_results('State Senator, District 13', 'SHELLY MASUR')
-masur_p = get_smc_results('State Senator, 13th District', 'SHELLY MASUR')
-# masur_p_scc = get_scc_results('State Senator, District 13', 'SALLY J. LIEBER')
-# masur_p = get_smc_results('State Senator, 13th District', 'SALLY J. LIEBER')
-masur_p.update(masur_p_scc)
+masur_p = get_scc_results('State Senator, District 13', 'SHELLY MASUR')
+masur_p.update(get_smc_results('State Senator, 13th District', 'SHELLY MASUR'))
 masur_p = pd.Series(masur_p)
+
+lieber_p = get_scc_results('State Senator, District 13', 'SALLY J. LIEBER')
+lieber_p.update(get_smc_results('State Senator, 13th District', 'SALLY J. LIEBER'))
+lieber_p = pd.Series(lieber_p)
 
 p13_p_scc = get_scc_results('Proposition 13', 'YES')
 p13_p = get_smc_results('Proposition 13 (Majority Approval Required)', 'YES')
